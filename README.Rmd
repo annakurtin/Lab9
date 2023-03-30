@@ -31,17 +31,20 @@ The `amt` package (animal movement tools) is a new package that is very handy fo
 ```{r eval=TRUE, message=FALSE, results='hide'}
 
 #function to install and load required packages
-ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-  if (length(new.pkg)) 
-    install.packages(new.pkg, dependencies = TRUE)
-  sapply(pkg, require, character.only = TRUE)
-}
+
 
 packages <- c("terra","sf","amt","mapview","tmap","tidyverse","survival","sjPlot","lme4")
 
 #run function to install packages
-ipak(packages)
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
 ```
 
 # Biased-Correlated Random Walks
@@ -56,11 +59,13 @@ This correlated random walk model was comprised of steps and turns, and Kareiva 
 
 In this first excercise, we will explore how different 'parameters' of movement (step, turns) and bias towards a centroid influence the spatial pattern of movement.  In essence, the BCRW is the driver of the movement kernel distribution in the iSSF models we will use from the package amt. 
 
-First, we make a function that draws random movements based on 3 parameters, a, b, rho (the degree of correaltion), and an attraction to a home range activity center.  a and b are parameters of the step lenght distribution, fit as a Weibull distribution. Larger values of a or b represent more or less longer step lenghts.  Rho is the degree of directional persistence or 'bias' in the correlation in direction between steps, and the attraction is equivalent to the mathematical advection term in Moorcroft and Barnett.  
+First, we make a function that draws random movements based on 3 parameters, a, b, rho (the degree of correaltion), and an attraction to a home range activity center.  a and b are parameters of the step length distribution, fit as a Weibull distribution. Larger values of a or b represent more or less longer step lenghts.  Rho is the degree of directional persistence or 'bias' in the correlation in direction between steps, and the attraction is equivalent to the mathematical advection term in Moorcroft and Barnett.  
 
 Here, we will compare just 3 types of fits to explore, but I encourage you to play around with the paramters on your own to get a feel for unbiased and biased correlated random walks. 
 ```{r crw}
 #### Correlated Random Walks
+## Package CircStats
+# Biased Correlated Random Walk 
 BCRW <- function(a = 2, b = 1, rho = 0.7, Z.center = 0, attraction = 0.5, n = 50, Z0 = 0){
   require(CircStats)
   
@@ -86,17 +91,49 @@ BCRW <- function(a = 2, b = 1, rho = 0.7, Z.center = 0, attraction = 0.5, n = 50
   return(Z)
 }
 
-BCRW(a = 2, b = 1, rho = 0, Z.center = 10, attraction = 0.25, n = 2000) %>% 
+# rho degree  of correlation
+# a and b are step length - larger values, longer step lengths 
+#, no attraction to a centroid but there is correlation bw step length and turning angle
+# Z center centers the home range along one axis
+# z center - the bigger it is the more oriented it is to the center of attraction on the y axis 
+
+# no attraction, no correlation
+BCRW(a = 1, b = 1, rho = 0, Z.center = 0, attraction = 0, n = 2000) %>% 
   plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
-       main = "a = 2, b = 1, rho = 0.2, attraction = 0")
+       main = "a = 2, b = 1, rho = 0.0, attraction = 0")
+# large, sprawling map with no center
 
-BCRW(a = 2, b = 1, rho = 0.5, Z.center = 10, attraction = 0.25, n = 2000) %>% 
-  plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 200)),
-       main = "a = 2, b = 1, rho = 0.7, attraction = 0.5")
+# no correlation, high attraction 
+BCRW(a = 2, b = 1, rho = 0, Z.center = 0, attraction = 0.9, n = 2000) %>% 
+  plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
+       main = "a = 2, b = 1, rho = 0.0, attraction = 0.9")
 
-BCRW(a = 2, b = 1, rho = 0.7, Z.center = 10, attraction = 0.25, n = 2000) %>% 
+# no attraction, high correlation
+BCRW(a = 2, b = 1, rho = 0.9, Z.center = 0, attraction = 0, n = 2000) %>% 
+  plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
+       main = "a = 2, b = 1, rho = 0.9, attraction = 0")
+# no obvious home range
+
+# add a small home range
+BCRW(a = 2, b = 1, rho = 0.9, Z.center = 0, attraction = 0.25, n = 2000) %>% 
+  plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
+       main = "a = 2, b = 1, rho = 0.9, attraction = 0.25")
+# no obvious home range
+
+# BCRW(a = 2, b = 1, rho = 0, Z.center = 10, attraction = 0.25, n = 2000) %>% 
+#   plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
+#        main = "a = 2, b = 1, rho = 0.0, attraction = 0.25")
+# 
+# BCRW(a = 2, b = 1, rho = 0.5, Z.center = 10, attraction = 0.25, n = 2000) %>% 
+#   plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 2000)),
+#        main = "a = 2, b = 1, rho = 0.7, attraction = 0.5")
+
+# high attraction and high correlation
+BCRW(a = 2, b = 1, rho = 0.9, Z.center = 0, attraction = 0.9, n = 2000) %>% 
   plot(type="o", asp=1, pch = 21, bg= grey(seq(0,1,length = 200 )),
-       main = "a = 2, b = 1, rho = 0.7, attraction = 0.8")
+       main = "a = 2, b = 1, rho = 0.9, attraction = 0.9")
+# looks like a nesting/denning animal
+## if you don't account for this centrality, you'll overestimate the importance of resources closer to centroid/den/nest
 
 ```
 
@@ -129,7 +166,6 @@ elk_df <- read_csv("./data/elk_df.csv")
 For some reason the `read_csv` function didn't parse the timestamp column as "datetime" format, so we'll manually convert it to POSIXct format, which is the date-time format that `amt` likes:
 ```{r}
 elk_df$timestamp <- as.POSIXct(elk_df$timestamp, format = "%m/%d/%y %H:%M")
-elk_df
 ```
 Now the "timestamp" column is formatted as a "datetime".
 
@@ -140,6 +176,7 @@ elk_sf <- st_as_sf(elk_df,
                    coords = c("lon","lat"), 
                    crs = "EPSG:4326")
 elk_sf_UTM <- st_transform(elk_sf, crs = "+proj=utm +zone=11 +ellps=GRS80 +units=m +no_defs")
+## Note: hard to measure distances between things in lat long, better to have UTM projection
 ```
 
 If we want to take a quick look at our elk data on an interactive map, we can plot it using `mapview` with a basemap of our choosing (there are a lot more basemap options and other ways to make this prettier.)
@@ -150,9 +187,7 @@ mapview(elk_sf, zcol="id", legend = TRUE, cex=5, lwd=2, map.type = "Esri.DeLorme
 
 We can overlay our elk telemetry locations on the elevation raster:
 ```{r}
-
-
-tmap_mode("plot")
+tmap_mode("view")
 map <- tm_shape(habitat_stack$elev) + tm_raster()
 map + tm_shape(elk_sf_UTM) + tm_dots(col = "id", palette = "Dark2", n = 6)
 
@@ -169,9 +204,11 @@ Note, here, I have created a subset of just 6 elk from our beloved elk GPS data.
 # Creating and nesting an `amt` track
 We'll use the make_track function to do this. Our data is in WGS 84, so we'll specify that as the coordinate reference system ("+init=epsg:4326"), and then transform it to UTM because `amt` requires projected data rather than lon lat. 
 ```{r}
+# first make the data into a track type to specify that it's a correlated series of movements
 elk_trk <- amt::make_track(elk_df, .x=lon, .y=lat, .t=timestamp, id=id, crs = "EPSG:4326") %>%
       amt::transform_coords("+proj=utm +zone=11 +ellps=GRS80 +units=m +no_defs")
-elk_trk
+
+# other packages require something called a move object
 ```
 Notice here that `amt` only requires fields for **x**, **y** and **time**, but all other fields, including animal **id** are optional. I think this is to allow flexibility on how you want to analyze the data. 
 
@@ -179,24 +216,29 @@ Obviously, because we are going to do SSF analyses, which are based on individua
 
 Nesting our data frame creates list-columns, which may be difficult to get used to at first but are quite handy. Here's we'll nest by animal id. However, if we had already broken our data into seasons and wanted to model resource selection by season, we could nest by both animal id and season, like this: `nest(-id, -season)`
 ```{r}
+# nest your track in your data frame by ID (like group_by) - this will create list items within the tibble
 elk_trk_nested <-
   elk_trk %>% 
-  nest(-id)
+  nest(data=-id)
 ```
 
 This shows the first element in the "data" list-column, which is the location data for the first individual. 
 ```{r}
 head(elk_trk_nested$data[[1]])
+
+# you need three locations in a row to calculate an angle 
 ```
 
 Check for duplicated time stamps and complete cases. for some functions of amt you need to ensure complete cases, and that there are no EXACTLY duplicated time stamps within a track, i.e., duplicated GPS locations.  These will yield errors. 
 ```{r}
+# issues with this code: doesn't take into account grouping by individual
 all(complete.cases(elk_trk))
-any(duplicated(elk_trk$ts))
+any(duplicated(elk_trk$t_))
 ```
 amt also has some additional functionality to calculate time of day, based on sun angle at that XY location and date based on the R package maptools. The helpfile for amt says time_of_day is a convenience wrapper around maptools::sunriset and maptools::crepuscule to extract if a fix was taken during day or night (optionally also include dawn and dusk).
 
 ```{r}
+# time of day allows you to determine if a fix rate was taken during daylight or nighttime 
 elk_trk <- time_of_day(elk_trk)
 head(elk_trk)
 table(elk_trk$tod_, elk_trk$id)
@@ -209,7 +251,7 @@ Before we create random "available" steps for each individual to use in an SSF a
 Let's see what our elk data look like. `amt`'s `summarize_sampling_rate` function gives us more information than we would ever want to know about the sampling interval, or time lag, between consecutive GPS locations. We'll add a new column called "lags".
 ```{r}
   elk_trk %>% 
-  nest(-id) %>% 
+  nest(data = -id) %>% 
   mutate(lags = map(data, summarize_sampling_rate))
 ## lets take a look at some of the summary statistics
 elk_trk2 <-elk_trk_nested %>% 
@@ -229,6 +271,8 @@ elk_trk %>%
 
 Luckily we have pretty consistent time lags of 2 hours across all individuals. So, the finest scale we can do an analysis would be at the 2-hr scale, which is probably something like between Johnson's 3rd to 4th order of selection.
 
+*you may have to thin the sample rate of some individuals to fit the lowest minimum fix rate*
+
 Here, we can use some more `amt` functions to calculate some simple movement statistics from our data. The `amt` package has a cool function called `time_of_day` which calculates whether a location is during the day or night based on the angle of the sun at the particular coordinates and the timestamp.
 ```{r, warning=F}
 elk_trk_stats <- 
@@ -237,7 +281,7 @@ elk_trk_stats <-
   mutate(speed = map(data, speed),
          step_length = map(data, step_lengths),
          tod_ = map(data, time_of_day), 
-         turn_angle = map(data, ~direction_rel(.) %>% as_degree(.))) %>%   dplyr::select(-data) %>% 
+         turn_angle = map(data, ~direction_rel(.) %>% as_degree(.))) %>%   dplyr::select(-data) %>% # remember degrees and radians, here we're doing it in degrees
   unchop(speed:turn_angle)
 ```
 The warnings here just let us know that we have a lot of different units in the summary statistics we've created. Step lengths are in meters, speeds in meters/second, and turn angles in degrees bound between -180 and 180. Notice the first turning angle is NA. This is because we need three consecutive locations to calculate a relative turning angle.
@@ -245,6 +289,11 @@ The warnings here just let us know that we have a lot of different units in the 
 You can see there are NAs in "speed", "step_length" and "turn_angle":
 ```{r}
 summary(elk_trk_stats)
+# step lengths are in meters (cartesian distance moved in two hours)
+## notice that the max step length is 34 km in two hours - seems too high
+# speed is in meters per second
+
+# turning angle is around zero
 ```
 Something strange happed with the summary statistics of time of day. 
 
@@ -272,6 +321,8 @@ elk_trk_stats %>%
                      labels = seq(-180, 180, by=60)) +
   facet_wrap(~id, scales="free") +
   theme(legend.position = "none")
+
+# distributions with a strong W means staying in one place vs distribution with a strong point means they were moving directionally
 ```
 
 If you plot turn angles by individual, you might see a lot of irregularities, especially for those animals with relatively few locations, but if you pool turn angles across individuals, it should be a cleaner plot with a definite hump in the middle centered around 0, meaning the animal moves straight ahead more often than other directions. To see what it looks like, try running all but the last two lines of the previous code.
@@ -288,6 +339,7 @@ elk_trk_stats %>%
 ```
 this is a very typical turning angle distribution showing directional persistence, i.e., animals tend to keep going in the same direction they were headed, 0 degrees.  And a lower frequency of about faces, 180 degree turns.  Les explore turning angles with polar plots. 
 
+### polar plot 
 ```{r}
 elk_trk_stats %>% 
   ggplot(., aes(x = turn_angle, y = ..density..)) +  
@@ -298,7 +350,7 @@ elk_trk_stats %>%
   ggtitle("Relative turn angles") + 
   scale_x_continuous("", limits = c(-180, 180), breaks = seq(-180, 180, by=60), labels = seq(-180, 180, by=60))
 ```
-
+#### polar plots by individual 
 ```{r}
 elk_trk_stats %>% 
   ggplot(., aes(x = turn_angle, y = ..density.., fill = id)) +  
@@ -313,6 +365,8 @@ elk_trk_stats %>%
 And we get a sense a bit of the differences in behaviour between individual animals is slight. 
 
 Next we can plot histograms of step lengths faceted by individual.
+
+*NEVER use a normal dist for step length*
 ```{r, warning=F}
 elk_trk_stats %>% 
   ggplot(., aes(x = step_length, fill=id)) +  
@@ -327,6 +381,8 @@ elk_trk_stats %>%
 ```
 
 This is the typical distribution we see for step lengths. Usually the animal takes shorter steps, and more rarely takes longer ones. The `amt` package fits a *gamma* distribution, which is a very flexible distribution, to step lengths and randomly samples from this distribution when creating "available" steps. However, there is some debate about whether it's more appropriate to randomly draw from the empirical (observed) step lengths rather than from a distributions fitted to those step lengths. Realistically the results are probably very similar with large enough sample sizes, but they could be very different with small sample sizes. 
+
+For step length, amt fits to a Von Mises distribution 
 
 Next we can plot histograms of step lengths faceted by individual.
 ```{r, warning=F}
@@ -345,6 +401,8 @@ elk_trk_stats %>%
 So, movement rate is approximately log-normal. Remember this - there is never ever ever anything normal about movement rate parameters. 
 
 How about we see if animals move faster during the day versus at night.
+
+Violin plots:
 ```{r, warning=F}
 ggplot(elk_trk_stats, aes(x = tod_[[4]], y = speed, fill=tod_[[4]])) + 
   geom_violin() +
@@ -373,7 +431,7 @@ Now we could create "available" steps by sampling from the distributions of step
 ```{r}
 elk_trk_id <- 
   elk_df %>% 
-  nest(-id) %>% 
+  nest(data = -id) %>% # nest by individual ID
   mutate(trk = map(data, function(d) {
     make_track(d, lon, lat, timestamp, crs = "EPSG:4326") %>%
       transform_coords("+proj=utm +zone=11 +ellps=GRS80 +units=m +no_defs")
@@ -433,9 +491,16 @@ ssf_2_hr <- elk_trk_id %>%
   dplyr::select(id, steps_2_hr) %>%
   unnest() 
 head(ssf_2_hr)
+
+# case TRUE is 1, FALSE is 0, step is the step ID within the burst, the burst ID
+# x1 y1 start, x2, y2, end, calculates sl_ step length and ta_ turning angle
+# time 1 (start) time 2 (end) and the delta time for each burst 
+
 ```
 
 So, we are doing a *point-based* SSF rather than a *path-based* SSF. [Daniel Fortin et al.'s SSF paper from 2005](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1890/04-0953) is an example of a path-based SSF. 
+
+point compares resources at the points to what was available at all available points, the paper he shows is doing it along paths instead
 
 Take a look at what we just created above with that monster chunk of code.
 ```{r}
@@ -483,11 +548,13 @@ ggplot(ssf_2_hr, aes(x = case_, y = d_human, fill=case_)) +
   xlab("")
 ```
 
-Looks like they might barely be selecting lower slopes, which is probably what we'd expect...
+Looks like they might barely be selecting lower human use, which is probably what we'd expect...
 
 # Running an SSF model in `amt`
 
 Before running our model, we need to create a "stratum" field, which is a unique identifier for each set of "used" and "available" points. This is because conditional logistic regression estimates relative probability of use conditioned on resources available at a given time step. To create this "stratum" field we'll just combine the animal "id" field" with the "step_id_" field.
+
+*If you're just doing it with one animal, you could just use step ID.
 
 ```{r}
 ssf_2_hr$stratum <- paste(ssf_2_hr$id, ssf_2_hr$burst_, ssf_2_hr$step_id_)
@@ -516,7 +583,7 @@ ssf_2_hr_scaled <-
 
 ## Fitting SSFs with clogit in R
 
-Next, we will fit a 'naive' clogit model, that is, a model that does not account for any differences between individuals and treats all step_id_'s as independent.Basically ignoring any random effects structure of individual fishers in this case. In Lab 10, next week, we will build complexity into SSF models with  mixed-effects.  But it takes a bit of learning to understand how R uses survival models to fit a conditional logistic regression model.  Here, I borrow from:
+Next, we will fit a 'naive' clogit model, that is, a model that does not account for any differences between individuals and treats all step_id_'s as independent.Basically ignoring any random effects structure of individual elk in this case. In Lab 10, next week, we will build complexity into SSF models with  mixed-effects.  But it takes a bit of learning to understand how R uses survival models to fit a conditional logistic regression model.  Here, I borrow from:
 _from https://rdrr.io/cran/survival/man/clogit.html_ 
 
 It turns out that the loglikelihood for a conditional logistic regression model = loglik from a Cox proportional hazards model with a particular data structure. Proving this is a nice homework exercise for a PhD statistics class; not too hard, but the fact that it is true is surprising.
@@ -525,6 +592,8 @@ When a well tested Cox PH model routine is available many packages use this ‘t
 
 Learn more about clogit 
 `?clogit`
+
+*These models can't be solved with maximum likelihood*
 
 Here's a simple model with three covariates (no distance to high human access). You'll see the "strata" argument in here, where we tell `clogit` what field has the unique id for matched sets of used and available points.  
 
@@ -535,6 +604,16 @@ ssf_model <-
            strata(stratum) + cluster(id), method = "approximate", data = ssf_2_hr_scaled)
 summary(ssf_model)
 ```
+
+Interpretation of the coefficients
+- if positive: the probability of selection increases with increasing value
+- if hazard ratio exp(coef) greater than one, increasing odds
+
+You can get seemingly counterintuitive relationships with conditional data
+- can look like they're selecting for high elevation but that is conditional on where they select/move to'
+
+Note that in the cox model we also don't get an intercept (which we don't interpret from the GLM model)
+
 
 You can see the robust standard errors in the summary output.
 
@@ -552,8 +631,9 @@ Note that we can analyze the same dataset, ignoring the conditioning of space in
 Lets compare the model coefficients from the ssf_model and rsf_model. We will just fit a simple glmm model with a random intercept for individual elk id, and not bother too much for now with glmmTMB, random coefficients, etc. 
 
 ```{r}
-glmm_model = glmer(case_ ~ elev + slope + d_human + (1|id), data=ssf_2_hr_scaled, family=binomial(link="logit"))
+glmm_model = glmer(case_ ~ elev + slope + d_human + (1|id), data=ssf_2_hr_scaled, family=binomial(link="logit")) # mixed effects model by adding a random effect by individual 
 summary(glmm_model)
+# now our elevation is 0.02, it's been cut in half pretty much 
 plot_model(ssf_model, transform = NULL)
 plot_model(glmm_model, transform = NULL)
 coef(ssf_model)
@@ -603,6 +683,7 @@ ssf_model3 <- clogit(case_ ~ elev + d_human + strata(stratum) + cluster(id), met
 
 ssf_model4 <- clogit(case_ ~ d_human + strata(stratum) + cluster(id), method = "approximate", data = ssf_2_hr_scaled)
 
+# you can use AIC within conditional regression, which then becomes conditional AIC
 AIC(ssf_model, ssf_model1, ssf_model2, ssf_model3, ssf_model4)
 ```
 However, we cannot use AIC to compare clogit models to glm models for the same data, but without conditioning. 
